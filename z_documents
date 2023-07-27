@@ -1,6 +1,0 @@
-project created on 24-07-2023 by lakshmi
-
-php artisan serve
-php artisan migrate:fresh --seed 
-php artisan serve
-
