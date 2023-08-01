@@ -31,7 +31,6 @@ class ClassFeeMasterController extends Controller
     // Add records
     public function store(Request $req)
     {
-
         $validator = Validator::make($req->all(), [
             'datas' => 'required|array',
             'datas.*.fyId' => 'required|numeric',
@@ -39,7 +38,7 @@ class ClassFeeMasterController extends Controller
             'datas.*.feeHeadTypeId' => 'required|numeric',
             'datas.*.feeHeadId' => 'required|numeric',
             'datas.*.feeAmount' => 'required|numeric',
-            'datas.*.description' => 'required|string',
+            'datas.*.description' => 'string',
             'datas.*.isMothChecked' => 'numeric',
             'datas.*.monthId' => 'required|numeric',
         ]);
@@ -97,7 +96,7 @@ class ClassFeeMasterController extends Controller
         }
     }
 
-    //show data by id
+    //show data by id 
     public function showFeeHeadByFyIdAndClassId(Request $req)
     {
         $validator = Validator::make($req->all(), [
@@ -108,8 +107,26 @@ class ClassFeeMasterController extends Controller
             return responseMsgs(false, $validator->errors(), []);
         try {
             $show = $this->_mClassFeeMasters->getFeeHeadByFyIdAndClassId($req);
-            // print_var($show);
-            // die;
+            if (collect($show)->isEmpty())
+                throw new Exception("Data Not Found");
+            $queryTime = collect(DB::getQueryLog())->sum("time");
+            return responseMsgsT(true, "View Records", $show, "API_4.3", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            return responseMsgs(false, $e->getMessage(), [], "", "API_4.3", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
+
+    //show data by id 
+    public function showFeeHeadByFyIdAndClassId1(Request $req)
+    {
+        $validator = Validator::make($req->all(), [
+            'fyId'        => 'required',
+            'classId'     => 'required'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            $show = $this->_mClassFeeMasters->getFeeHeadByFyIdAndClassId1($req);
             if (collect($show)->isEmpty())
                 throw new Exception("Data Not Found");
             $queryTime = collect(DB::getQueryLog())->sum("time");

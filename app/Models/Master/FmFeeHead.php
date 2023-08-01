@@ -45,4 +45,10 @@ class FmFeeHead extends Model
       ->orderByDesc('id');
     // ->get();
   }
+
+  /*Count all Active Records*/
+  public function countActive()
+  {
+    return FmFeeHead::where('status', 1)->count();
+  }
 }

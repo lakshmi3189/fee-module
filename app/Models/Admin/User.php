@@ -34,10 +34,10 @@ class User extends Authenticatable
     ];
 
     /*Read Records by ID*/
-    public function getGroupById($id)
+    public function getGroupById($req)
     {
         return User::select(
-            DB::raw("id,name,email,user_name,
+            DB::raw("id,name,email,user_name,remember_token,
         CASE 
             WHEN status = '0' THEN 'Deactivated'  
             WHEN status = '1' THEN 'Active'
@@ -46,7 +46,8 @@ class User extends Authenticatable
         TO_CHAR(created_at,'HH12:MI:SS AM') as time
       ")
         )
-            ->where('id', $id)
+            ->where('remember_token', $req->token)
+            ->OrWhere('id', $req->id)
             ->first();
     }
 }

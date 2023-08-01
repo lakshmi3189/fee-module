@@ -51,4 +51,10 @@ class MsClass extends Model
       ->orderBy('id')
       ->get();
   }
+
+  /*Count all Active Records*/
+  public function countActive()
+  {
+    return MsClass::where('status', 1)->count();
+  }
 }

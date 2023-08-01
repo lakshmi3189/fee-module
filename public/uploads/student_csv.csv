@@ -1,12 +1,12 @@
-admission date,roll no,full name,class name,section name,dob,admission no,email,mobile,gender,special disability,category name,financial year,school staff,status
-04-04-2023,1,Umesh Kumar,XI,B,01-01-2019,Reg/2023/001,xyz1@mail.com,98765432112,male,no ,General,2023-2024,no ,deactive
-04-04-2023,4,Rohit Kumar,XII,A,01-01-2019,Reg/2023/002,xyz1@mail.com,98765432112,male,no ,SC,2023-2024,no ,active
-04-04-2023,3,Prashant Sir,IX,A,01-01-2019,Reg/2023/003,xyz1@mail.com,98765432112,male,yes,ST,2023-2024,no ,active
-04-04-2023,1,Emran Sir,VIII,D,01-01-2019,Reg/2023/004,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active
-04-04-2023,1,Emran Sir,VIII,D,01-01-2019,Reg/2023/004,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active
-04-04-2023,1,Umesh Kumar,XI,B,01-01-2019,Reg/2023/005,xyz1@mail.com,98765432112,male,no ,General,2023-2024,no ,deactive
-04-04-2023,1,Rohit Kumar,XII,A,01-01-2019,Reg/2023/006,xyz1@mail.com,98765432112,male,no ,SC,2023-2024,no ,active
-04-04-2023,1,Prashant Sir,IX,C,01-01-2019,Reg/2023/007,xyz1@mail.com,98765432112,male,yes,ST,2023-2024,no ,active
-04-04-2023,1,Emran Sir,VIII,C,01-01-2019,Reg/2023/008,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active
-04-04-2023,1,Shyam,VIII,A,01-01-2019,Reg/2023/009,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active
-04-04-2023,1,Ram ,VIII,D,01-01-2019,Reg/2023/010,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active
+admission date,roll no,full name,class name,section name,dob,admission no,email,mobile,gender,special disability,category name,financial year,school staff,status,father_name
+4/4/2023,1,Umesh Kumar,I,B,1/1/2019,Reg/2023/001,xyz1@mail.com,98765432112,male,no ,General,2023-2024,no ,deactive,sumesh kumar
+4/4/2023,4,Rohit Kumar,II,A,1/1/2019,Reg/2023/002,xyz1@mail.com,98765432112,male,no ,SC,2023-2024,no ,active,
+4/4/2023,3,Prashant Sir,I,A,1/1/2019,Reg/2023/003,xyz1@mail.com,98765432112,male,yes,ST,2023-2024,no ,active,
+4/4/2023,1,Emran Sir,II,D,1/1/2019,Reg/2023/004,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active,
+4/4/2023,1,Emran Sir,III,D,1/1/2019,Reg/2023/004,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active,
+4/4/2023,1,Umesh Kumar,I,B,1/1/2019,Reg/2023/005,xyz1@mail.com,98765432112,male,no ,General,2023-2024,no ,deactive,rohit kumar
+4/4/2023,1,Rohit Kumar,I,A,1/1/2019,Reg/2023/006,xyz1@mail.com,98765432112,male,no ,SC,2023-2024,no ,active,
+4/4/2023,1,Prashant Sir,I,C,1/1/2019,Reg/2023/007,xyz1@mail.com,98765432112,male,yes,ST,2023-2024,no ,active,
+4/4/2023,1,Emran Sir,II,C,1/1/2019,Reg/2023/008,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active,
+4/4/2023,1,Shyam,II,A,1/1/2019,Reg/2023/009,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active,
+4/4/2023,1,Ram ,II,D,1/1/2019,Reg/2023/010,xyz1@mail.com,98765432112,male,no ,OBC,2023-2024,yes,active,
