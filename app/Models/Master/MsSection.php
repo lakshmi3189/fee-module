@@ -47,4 +47,10 @@ class MsSection extends Model
       ->orderBy('id')
       ->get();
   }
+
+  /*Count all Active Records*/
+  public function countActive()
+  {
+    return MsSection::where('status', 1)->count();
+  }
 }

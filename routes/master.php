@@ -1,12 +1,5 @@
 <?php
 
-
-/**
- * | Created On-24-07-2023 
- * | Author - Umesh Kumar
- * | Code Status : Open
- */
-
 use App\Http\Controllers\API\Master\ClassMasterController;                                  //M_API_1
 use App\Http\Controllers\API\Master\FeeHeadTypeController;                                  //M_API_2
 use App\Http\Controllers\API\Master\FeeHeadController;                                      //M_API_3
@@ -15,52 +8,55 @@ use App\Http\Controllers\API\Master\CategoryController;                         
 use App\Http\Controllers\API\Master\MonthController;                                        //M_API_6                      
 use App\Http\Controllers\API\Master\FinancialYearController;                                //M_API_7
 
+/**
+ * | Created On-24-07-2023 
+ * | Author - Umesh Kumar
+ * | Code Status : Close
+ */
 
-// ==============================================Public Routes Start===========================================================
+/**
+ * | Updated On- 28-07-2023 
+ * | Author - Lakshmi Kumari
+ * | Code Status : Open
+ */
 
-// ==================== 24/07/2023 ================
+// ========================================Private Routes Start=======================================
 
 Route::controller(ClassMasterController::class)->group(function () {
-    Route::post('class/active-all', 'activeAll');                                         // Get all     M_API_1.1
+    Route::post('class/active-all', 'activeAll');                       // Get all active   M_API_1.1
+    Route::post('class/count-all', 'countClass');                       // Get all count    M_API_1.2
 });
 
 Route::controller(FeeHeadTypeController::class)->group(function () {
-    Route::post('feehead-type/active-all', 'activeAll');                        // Get all     M_API_2.1            
-    Route::post('feehead-type/retrieve-all', 'retrieveAll');                    // Get all     M_API_2.2       
+    Route::post('feehead-type/active-all', 'activeAll');               // Get all active    M_API_2.1            
+    // Route::post('feehead-type/retrieve-all', 'retrieveAll');        // Get all           M_API_2.2       
 });
 
 Route::controller(FeeHeadController::class)->group(function () {
-    Route::post('feehead/active-all', 'activeAll');                             // Get all      M_API_3.1              
-    Route::post('feehead/retrieve-all', 'retrieveAll');                         // Get all      M_API_3.2         
+    Route::post('feehead/active-all', 'activeAll');                    // Get all  active   M_API_3.1 
+    Route::post('feehead/count-all', 'countFeeHead');                  // Get all count     M_API_3.2
+    // Route::post('feehead/retrieve-all', 'retrieveAll');             // Get all           M_API_3.3 
 });
 
 Route::controller(SectionController::class)->group(function () {
-    Route::post('section/active-all', 'activeAll');                                       // Get all       M_API_4.1
+    Route::post('section/active-all', 'activeAll');                    // Get all active    M_API_4.1
+    Route::post('section/count-all', 'countSection');                  // Get all count     M_API_4.2
+    // Route::post('section/retrieve-all', 'retrieveAll');             // Get all           M_API_4.3
 });
 
 Route::controller(CategoryController::class)->group(function () {
-    Route::post('category/active-all', 'activeAll');                             // Get all      M_API_5.1              
-    Route::post('category/retrieve-all', 'retrieveAll');                         // Get all      M_API_5.2          
+    Route::post('category/active-all', 'activeAll');                   // Get all active    M_API_5.1
 });
 
 Route::controller(MonthController::class)->group(function () {
-    Route::post('month/active-all', 'activeAll');                               // Get all      M_API_6.1              
-    Route::post('month/retrieve-all', 'retrieveAll');                           // Get all      M_API_6.2         
+    Route::post('month/active-all', 'activeAll');                      // Get all active    M_API_6.1        
 });
 
 Route::controller(FinancialYearController::class)->group(function () {
-    Route::post('financial-year/active-all', 'activeAll');                      // Get all      M_API_7.1
+    Route::post('financial-year/active-all', 'activeAll');             // Get all active    M_API_7.1
 });
 
-
-
-
-// ==============================================Public Routes End=============================================================
-
-
-    
-
-   
+// ========================================Private Routes End==========================================
 
 
 

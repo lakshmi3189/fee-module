@@ -15,7 +15,8 @@
         "laravel/framework": "^10.0",
         "laravel/sanctum": "^3.2",
         "laravel/tinker": "^2.8",
-        "predis/predis": "^2.1"
+        "predis/predis": "^2.1",
+        "ramsey/uuid": "^4.7"
     },
     "require-dev": {
         "barryvdh/laravel-ide-helper": "^2.13",

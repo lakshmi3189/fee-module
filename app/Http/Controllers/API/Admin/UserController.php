@@ -172,12 +172,13 @@ class UserController extends Controller
     public function showProfile(Request $req)
     {
         $validator = Validator::make($req->all(), [
-            'id' => 'required|numeric'
+            'id' => 'numeric|nullable',
+            'token' => 'required|string'
         ]);
         if ($validator->fails())
             return responseMsgs(false, $validator->errors(), []);
         try {
-            $show = $this->_mUsers->getGroupById($req->id);
+            $show = $this->_mUsers->getGroupById($req);
             if (collect($show)->isEmpty())
                 throw new Exception("Data Not Found");
             $queryTime = collect(DB::getQueryLog())->sum("time");
