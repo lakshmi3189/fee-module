@@ -56,13 +56,14 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('student/store', 'store');                                    // Store  Data                 API_3.4
         Route::post('student/count-active', 'countActiveStudent');                // Get all active              API_3.5
         Route::post('student/count-all', 'countAllStudent');                      // Get all                     API_3.6
+        Route::post('student/fee-history', 'showStudentFeesHistory');             // Edit all                     API_3.7
     });
     //Class Fee Master
     Route::controller(ClassFeeMasterController::class)->group(function () {
         Route::post('class-fee/store', 'store');                                  // Store Data                  API_4.1
         Route::post('class-fee/retrieve-all', 'retrieveAll');                     // get Data                    API_4.2
         Route::post('class-fee/show-fee', 'showFeeHeadByFyIdAndClassId');         // get Data                    API_4.3
-        Route::post('class-fee/show-fee-test', 'showFeeHeadByFyIdAndClassId1');         // get Data                    API_4.3
+        Route::post('class-fee/show-fee-test', 'showFeeHeadByFyIdAndClassId1');   // for testing              
     });
     //Daily Fee Collection
     Route::controller(DailyFeeCollectionController::class)->group(function () {
@@ -71,7 +72,9 @@ Route::middleware('auth:sanctum')->group(function () {
     //Fee collection
     Route::controller(FeeCollectionController::class)->group(function () {
         Route::post('fee-collection/store', 'store');                             // Store                     API_6.1
-        Route::post('fee-collection/show', 'show');                               // Get by all                API_6.2
+        Route::post('fee-collection/show', 'showByReceiptNo');                    // Get by all                API_6.2
+        Route::post('fee-collection/edit', 'updateDue');                          // Edit                      API_6.3
+        Route::post('fee-collection/search-receipt', 'generateByFyClassMonthAndReceiptNo'); // get receipt     API_6.4
     });
     //ReportController
     Route::controller(ReportController::class)->group(function () {

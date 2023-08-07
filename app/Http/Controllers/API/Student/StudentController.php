@@ -6,10 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Master\MsCategory;
 use App\Models\Master\MsClass;
 use App\Models\Master\MsSection;
+use App\Models\Master\MsMonth;
 use App\Models\Master\MsFinancialYear;
 use Illuminate\Http\Request;
 use App\Models\Student\Student;
 use App\Models\Master\ReceiptCounter;
+use App\Models\FeeStructure\FeeCollection;
 use Illuminate\Support\Str;
 use Exception;
 use Validator;
@@ -26,11 +28,13 @@ class StudentController extends Controller
 {
     private $_mStudents;
     private $_mReceiptCounters;
+    private $_mMsMonths;
 
     public function __construct()
     {
         DB::enableQueryLog();
         $this->_mStudents = new Student();
+        $this->_mMsMonths = new MsMonth();
         $this->_mReceiptCounters = new ReceiptCounter();
     }
 
@@ -345,5 +349,97 @@ class StudentController extends Controller
         } catch (Exception $e) {
             return responseMsgs(false, $e->getMessage(), [], "", "API_3.6", responseTime(), "POST", $req->deviceId ?? "");
         }
+    }
+
+    public function showStudentFeesHistory(Request $req)
+    {
+        $validator = Validator::make($req->all(), [
+            'fyId' => 'required|numeric',
+            'classId'    => 'required|numeric',
+            'searchId'     => 'required'
+            // 'admissionNo'  => 'required|string',
+            // 'fullName'  => 'string',
+            // 'fatherName'  => 'required|string'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            // Fetch the student details based on the provided admission number
+            // $student = Student::where(DB::raw('upper(admission_no)'), strtoupper($req->admissionNo))->first();
+            if ($req->searchId == "admission" && $req->admissionNo != "") {
+                $student = $this->_mStudents->getStudentByClassAndAdmissionNo($req);
+            } elseif ($req->searchId == "name" && $req->fatherName != "") {
+                $student = $this->_mStudents->getStudentByClassIdAndNameAndFatherName($req);
+            } else {
+                if ($req->searchId == "admission") {
+                    throw new Exception("Please Enter Admission No.");
+                }
+                if ($req->searchId == "name") {
+                    throw new Exception("Please Enter Name & Father Name");
+                }
+            }
+
+            if (!$student)
+                throw new Exception("Student Not Found");
+
+            // Fetch the data from the database based on the provided input
+            $data = FeeCollection::where('fy_id', $req->fyId)
+                ->where('class_id', $req->classId)
+                ->where('student_id', $student->id)
+                ->orWhere(DB::raw('upper(admission_no)'), strtoupper($req->admissionNo))
+                ->get();
+
+            if ($data->isEmpty())
+                throw new Exception("Fees History Not Found");
+
+            // Initialize an empty array to store the formatted data
+            $formattedData = [];
+
+            // Group the fee collection data by 'month_id'
+            $groupedData = $data->groupBy('month_id');
+
+            foreach ($groupedData as $monthId => $collection) {
+                // Get the month name based on the month_id (assuming month names are static)
+                $monthName = $this->getMonthName($monthId);
+
+                // Initialize an empty array to store the fee details for each month
+                $feeDetails = [];
+
+                foreach ($collection as $record) {
+                    $feeDetails[] = [
+                        'feeCollId' => $record->id,
+                        'stdId' => $student->id,
+                        'feeHeadName' => $record->fee_head_name,
+                        'amount' => $record->fee_amount,
+                        'receivedAmount' => $record->received_amount,
+                        'dueAmount' => $record->due_amount,
+                        'color' => $record->due_amount > 0 ? '#fff1f2' : '',
+                    ];
+                }
+
+                // Add the formatted data for each month to the main array
+                $formattedData[] = [
+                    'monthName' => $monthName,
+                    'monthId' => $monthId,
+                    'fyId' => $req->fyId,
+                    'classId' => $req->classId,
+                    'admission_no' => $req->admissionNo,
+                    'feeDtl' => $feeDetails,
+                ];
+            }
+
+            //count query execution time
+            $queryTime = collect(DB::getQueryLog())->sum("time");
+            return responseMsgsT(true, "View Fee History", $formattedData, "API_3.7", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            return responseMsgs(false, $e->getMessage(), [], "", "API_3.7", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
+
+    // Helper function to get the month name based on month_id
+    private function getMonthName($monthId)
+    {
+        $months = $this->_mMsMonths->getMonthList();
+        return $months[$monthId] ?? 'Unknown';
     }
 }

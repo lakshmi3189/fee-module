@@ -34,8 +34,8 @@ class FeeCollection extends Model
   //
   public function getReceiptNoExist($req)
   {
-    return FeeCollection::where('receipt_no', $req->receiptNo)
-      ->get();
+    return FeeCollection::where(DB::raw('upper(receipt_no)'), strtoupper($req->receiptNo))->get();
+    // return FeeCollection::where('receipt_no', $req->receiptNo)->get();
   }
 
   /*Read Records by ID*/

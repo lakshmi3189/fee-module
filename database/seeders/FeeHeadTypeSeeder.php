@@ -13,7 +13,7 @@ class FeeHeadTypeSeeder extends Seeder
      */
     public function run(): void
     {
-        $data = ['Special Month', 'Monthly', 'Quarterly', 'Half Yearly', 'Yearly', 'Exam Head'];
+        $data = ['Special Month', 'Monthly', 'Yearly'];
 
         foreach ($data as $val) {
             DB::table('fm_fee_head_types')->insert([

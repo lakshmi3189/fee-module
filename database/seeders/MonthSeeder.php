@@ -13,7 +13,7 @@ class MonthSeeder extends Seeder
      */
     public function run(): void
     {
-        $data = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        $data = ['April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December', 'January', 'February', 'March'];
 
         foreach ($data as $val) {
             DB::table('ms_months')->insert([

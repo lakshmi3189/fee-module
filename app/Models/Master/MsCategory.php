@@ -12,6 +12,11 @@ class MsCategory extends Model
 
   protected $guarded = [];
 
+  public function getExist($req)
+  {
+    return MsCategory::where(DB::raw('upper(category_name)'), strtoupper($req->categoryName))->get();
+  }
+
   /*Read all Active Records*/
   public function active()
   {

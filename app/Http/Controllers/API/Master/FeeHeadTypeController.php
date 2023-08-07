@@ -43,31 +43,4 @@ class FeeHeadTypeController extends Controller
             return responseMsgs(false, $e->getMessage(), [], "", "M_API_2.1", responseTime(), "POST", $req->deviceId ?? "");
         }
     }
-
-    /**
-     * | Commented On- 28-07-2023 
-     * | Commented By- Lakshmi Kumari
-     * | Description - if need to show all records
-     */
-    // public function retrieveAll(Request $req)
-    // {
-    //     try {
-    //         $getData = $this->_mFeeHeadTypes->retrieve();
-    //         $perPage = $req->perPage ? $req->perPage : 10;
-    //         $paginater = $getData->paginate($perPage);
-    //         // if ($paginater == "")
-    //         //     throw new Exception("Data Not Found");
-    //         $list = [
-    //             "current_page" => $paginater->currentPage(),
-    //             "perPage" => $perPage,
-    //             "last_page" => $paginater->lastPage(),
-    //             "data" => $paginater->items(),
-    //             "total" => $paginater->total()
-    //         ];
-    //         $queryTime = collect(DB::getQueryLog())->sum("time");
-    //         return responseMsgsT(true, "View All Records", $list, "M_API_2.2", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "M_API_2.2", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
 }

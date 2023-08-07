@@ -50,6 +50,14 @@ class FmClassFeeMaster extends Model
 
   public function getFeeHeadByFyIdAndClassId1($req)
   {
+    $getFeesExist = DB::table('fee_collections as a')
+      ->select('a.id', 'a.fy_id', 'a.class_id', 'a.admission_no', 'a.month_name', 'a.fee_head_name', 'a.fee_amount', 'a.received_amount', 'a.due_amount')
+      ->join('fm_class_fee_masters as b', 'b.class_id', '=', 'a.class_id')
+      ->where('a.status', 1)
+      ->where('a.fy_id', $req->fyId)
+      ->where('a.class_id', $req->classId)
+      ->get();
+
     $from = DB::table('fm_class_fee_masters as a')
       ->join('ms_financial_years as b', 'b.id', '=', 'a.fy_id')
       ->join('ms_classes as c', 'c.id', '=', 'a.class_id')
@@ -61,7 +69,7 @@ class FmClassFeeMaster extends Model
       ->where('a.class_id', $req->classId)
       ->select(
         DB::raw("
-            b.financial_year, c.class_name, d.fee_head_type, e.fee_head_name, f.month_name, f.id as month_id,
+            b.financial_year, c.class_name, d.fee_head_type, e.fee_head_name, f.month_name,a.month_id,
             a.fee_amount, a.description, a.fee_head_id,
             CASE 
                 WHEN a.status = '0' THEN 'Deactivated'  
@@ -73,6 +81,10 @@ class FmClassFeeMaster extends Model
       );
 
     $fees = $from->get();
+    print_var($fees);
+    die;
+
+    // return  $fees->month_id->toArray();
 
     $feeColl = DB::table('fee_collections')->get();
 
@@ -88,8 +100,8 @@ class FmClassFeeMaster extends Model
       }
 
       if (in_array($monthId, $secondQueryMonthIds)) {
-        $monthWiseFees[$monthId][] = $fee;
-        $monthWiseFees[$monthId]['message'] = 'Month is existing in the second query.';
+        $monthWiseFees[$monthId]['feeDtl'] = $fee;
+        $monthWiseFees[$monthId]['message'] = 'Month is existing.';
       } else {
         $monthWiseFees[$monthId][] = $fee;
       }
@@ -107,18 +119,23 @@ class FmClassFeeMaster extends Model
 
   public function getFeeHeadByFyIdAndClassId($req)
   {
+    // return $getFeesExist = DB::table('fee_collections as a')
+    // ->join('fm_class_fee_masters as b', 'b.class_id','=','a.class_id')->get();
+
+    //b.financial_year,c.class_name,d.fee_head_type,e.fee_head_name,f.month_name,f.id as month_id,
     $from = DB::table('fm_class_fee_masters as a')
       ->join('ms_financial_years as b', 'b.id', '=', 'a.fy_id')
       ->join('ms_classes as c', 'c.id', '=', 'a.class_id')
       ->join('fm_fee_head_types as d', 'd.id', '=', 'a.fee_head_type_id')
       ->join('fm_fee_heads as e', 'e.id', '=', 'a.fee_head_id')
       ->join('ms_months as f', 'f.id', '=', 'a.month_id')
+      // ->leftjoin('fee_collections as g', 'g.class_id', '=', 'a.class_id')
       ->where('a.status', 1)
       ->where('a.fy_id', $req->fyId)
       ->where('a.class_id', $req->classId);
     $fees = $from->select(
       DB::raw("
-          b.financial_year,c.class_name,d.fee_head_type,e.fee_head_name,f.month_name,f.id as month_id,
+          b.financial_year,c.class_name,d.fee_head_type,e.fee_head_name,f.month_name,a.month_id,
           a.fee_amount,a.description,a.fee_head_id,
           CASE 
           WHEN a.status = '0' THEN 'Deactivated'  
@@ -128,6 +145,11 @@ class FmClassFeeMaster extends Model
           TO_CHAR(a.created_at,'HH12:MI:SS AM') as time
           ")
     )->get();
+
+    // $getFeesExist = DB::table('fee_collections as a')
+    //   ->where('a.fy_id', $req->fyId)
+    //   ->where('a.class_id', $req->classId)
+    //   ->get();
 
     // $feeColl = DB::table('fee_collections')->get();
     $groupedData = collect($fees)->groupBy(function ($item) {

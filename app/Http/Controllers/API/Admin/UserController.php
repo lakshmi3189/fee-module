@@ -64,7 +64,7 @@ class UserController extends Controller
                 $mUser->remember_token = $token;
                 $mUser->save();
                 $this->userLogIn($req, $token);
-                $data1 = ['userName' => $mUser->user_name, 'email' => $mUser->email, 'token' => $token, 'token_type' => 'Bearer'];
+                $data1 = ['id' => $mUser->id, 'name' => $mUser->name, 'userName' => $mUser->user_name, 'email' => $mUser->email, 'token' => $token, 'token_type' => 'Bearer'];
                 $queryTime = collect(DB::getQueryLog())->sum("time");
                 return responseMsgsT(true, "Login successfully", $data1, "API_1.1", "", responseTime(), "POST", $mDeviceId, $token);
             } else
@@ -172,8 +172,8 @@ class UserController extends Controller
     public function showProfile(Request $req)
     {
         $validator = Validator::make($req->all(), [
-            'id' => 'numeric|nullable',
-            'token' => 'required|string'
+            'id' => 'required|numeric',
+            // 'token' => 'string|nullable'
         ]);
         if ($validator->fails())
             return responseMsgs(false, $validator->errors(), []);

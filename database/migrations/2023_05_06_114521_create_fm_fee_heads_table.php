@@ -16,6 +16,8 @@ return new class extends Migration
             $table->string('fee_head_name');
             $table->integer('version_no')->default(0);      //common for all table   
             $table->smallInteger('status')->default(1);     //1-Active, 2-Not Active
+            $table->bigInteger('created_by')->nullable();   //common for all table   
+            $table->string('ip_address');                   //common for all table   
             $table->text('json_logs');
             $table->timestamps();
         });
