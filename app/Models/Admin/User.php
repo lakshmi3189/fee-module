@@ -46,8 +46,8 @@ class User extends Authenticatable
         TO_CHAR(created_at,'HH12:MI:SS AM') as time
       ")
         )
-            ->where('remember_token', $req->token)
-            ->OrWhere('id', $req->id)
+            ->where('id', $req->id)
+            // ->OrWhere('remember_token', $req->token)
             ->first();
     }
 }

@@ -11,6 +11,11 @@ class FmFeeHeadType extends Model
   use HasFactory;
   protected $guarded = [];
 
+  public function getExist($req)
+  {
+    return FmFeeHeadType::where('id', $req)->get();
+    // return FmFeeHeadType::where(DB::raw('upper(fee_head_type)'), strtoupper($req->feeHeadType))->get();
+  }
   /*Read all Active Records*/
   public function active()
   {

@@ -13,8 +13,7 @@ class FeeHeadSeeder extends Seeder
      */
     public function run(): void
     {
-        $data = ['Exam Fee', 'Computer Fee', 'Registration Fee', 'Admission Fee', 'Sports Fee', 'Tuition Fee'];
-
+        $data = ['Other Fee'];
         foreach ($data as $val) {
             DB::table('fm_fee_heads')->insert([
                 'fee_head_name' => $val,

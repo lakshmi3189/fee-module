@@ -13,6 +13,11 @@ class MsSection extends Model
 
   protected $guarded = [];
 
+  public function getExist($req)
+  {
+    return MsSection::where(DB::raw('upper(section)'), strtoupper($req->sectionName))->get();
+  }
+
   public function retrieve()
   {
     return MsSection::select(

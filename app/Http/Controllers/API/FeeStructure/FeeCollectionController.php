@@ -13,6 +13,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Master\ReceiptCounter;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Hash;
+
+
 // use Haruncpi\LaravelIdGenerator\IdGenerator;
 use DB;
 
@@ -53,7 +57,8 @@ class FeeCollectionController extends Controller
             'feeCollection.*.feeHeadName' => 'required|string',
             'feeCollection.*.amount' => 'required|numeric',
             'feeCollection.*.receivedAmount' => 'required|numeric',
-            'feeCollection.*.dueAmount' => 'required|numeric'
+            'feeCollection.*.dueAmount' => 'required|numeric',
+            'feeCollection.*.description' => 'string|nullable'
         ]);
         if ($validator->fails())
             return responseMsgs(false, $validator->errors(), []);
@@ -66,7 +71,7 @@ class FeeCollectionController extends Controller
             $fyName = $fyObj->financial_year;
 
             $mStudents = Student::whereRaw('LOWER(admission_no) LIKE ?', [strtolower("%$req->admissionNo%")])
-                // where('admission_no', $req->admissionNo)
+                // where('admission_no', $req->admissionNo) 
                 ->where('status', 1)
                 ->first();
             if (collect($mStudents)->isEmpty())
@@ -85,7 +90,7 @@ class FeeCollectionController extends Controller
                 $feeCollection->month_id = $feeData['monthId'];
                 $feeCollection->month_name = $feeData['monthName'];
                 $feeCollection->student_id = $studentId;
-                $feeCollection->admission_no = $req['admissionNo'];
+                $feeCollection->admission_no = Str::title($req['admissionNo']);
                 $feeCollection->class_id = $req['classId'];
                 $feeCollection->class_name = $req['className'];
                 $feeCollection->payment_mode = $req['paymentMode'];
@@ -96,9 +101,13 @@ class FeeCollectionController extends Controller
                 $feeCollection->received_amount = $feeData['receivedAmount'];
                 $feeCollection->due_amount = $feeData['dueAmount'];
                 $feeCollection->receipt_no = $receipt;
-                $feeCollection->is_paid = $feeData['isPaid'];
+                $feeCollection->description = '';
+                $feeCollection->description = $feeData['description'];
                 $feeCollection->created_by = authUser()->id;
                 $feeCollection->ip_address = getClientIpAddress();
+                $feeCollection->json_logs = trim($feeCollection->json_logs . "," . json_encode($feeCollection), ",");
+                // print_var($feeCollection);
+                // die;
                 $feeCollection->save();
             }
             DB::commit();
@@ -110,7 +119,8 @@ class FeeCollectionController extends Controller
         }
     }
 
-    public function show(Request $req)
+    //show data by receipt no 
+    public function showByReceiptNo(Request $req)
     {
         $validator = Validator::make($req->all(), [
             'receiptNo' => 'required|string'
@@ -146,6 +156,7 @@ class FeeCollectionController extends Controller
                 $paymentDate = Carbon::parse($monthData->first()->payment_date)->format('d-m-y');
                 $monthPaid = $monthData->first()->month_name;
                 $isPaid = $monthData->first()->is_paid;
+                $isMonth = $monthData->first()->is_month;
                 $details = $monthData->map(function ($item) {
                     return [
                         'feeHeadName' => $item->fee_head_name,
@@ -162,6 +173,7 @@ class FeeCollectionController extends Controller
                     'paymentDate' => $paymentDate,
                     'monthPaid' => $monthPaid,
                     'isPaid' => $isPaid,
+                    'isMonthPresent' => $isMonth,
                     'details' => $details->toArray(),
                 ];
             });
@@ -172,6 +184,178 @@ class FeeCollectionController extends Controller
             return responseMsgs(false, $e->getMessage(), [], "", "API_6.2", responseTime(), "POST", $req->deviceId ?? "");
         }
     }
+
+    //show data by receipt no - report
+    //fyId, classId, monthId, receiptNo
+    public function generateByFyClassMonthAndReceiptNo(Request $req)
+    {
+        $validator = Validator::make($req->all(), [
+            'fyId' => 'required|numeric',
+            'classId' => 'required|numeric',
+            'monthId' => 'required|numeric',
+            'admissionNo' => 'required|string'
+            // 'receiptNo' => 'required|string'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            // $validatedData = $req->validate([
+            //     'fyId' => 'required|numeric',
+            //     'classId' => 'required|numeric',
+            //     'monthId' => 'required|numeric',
+            //     // 'receiptNo' => 'required|string',
+            //     'admissionNo' => 'required|string'
+            // ]);
+            // return $validatedData['fyId'];
+            // die;
+            // return $hashedData = Hash::make($validatedData['fyId'] . $validatedData['classId'] . $validatedData['monthId'] . $validatedData['receiptNo']);
+
+            // $show = $this->_mFeeCollections->getReceiptNoExist($req);
+            // if (collect($show)->isEmpty())
+            //     throw new Exception("Receipt No Not Found");
+
+            // $receiptNo = $req->input('receiptNo');
+
+            $mStudents = Student::whereRaw('LOWER(admission_no) LIKE ?', [strtolower("%$req->admissionNo%")])
+                ->where('status', 1)
+                ->first();
+            if (collect($mStudents)->isEmpty())
+                throw new Exception('Admission no is not existing');
+            $studentId  = $mStudents->id;
+
+            // Fetch the feeCollection data based on the provided receipt number
+            $feeCollection = FeeCollection::where('fy_id', $req->fyId)
+                ->where('class_id', $req->classId)
+                ->where('month_id', $req->monthId)
+                // ->where('receipt_no', $req->receiptNo)
+                ->where('student_id', $studentId)
+                ->get();
+
+            // Check if data is found and return the response accordingly            
+            if ($feeCollection->isEmpty())
+                throw new Exception('Fee Details Not Found');
+            //  {
+            //     return response()->json([
+            //         'status' => false,
+            //         'message' => 'Data Not Found',
+            //         'data' => []
+            //     ]);
+            // }
+            //$studentId = $feeCollection->first()->student_id;
+            $student = Student::select('admission_no', 'full_name', 'class_name', 'section_name', 'roll_no')
+                ->where('id', $studentId)
+                ->where('status', 1)
+                ->first();
+
+            // Group the feeCollection data by "month_name"
+            $monthWiseData = $feeCollection->groupBy('month_name')->map(function ($monthData) {
+                $totalFees = $monthData->sum('fee_amount');
+                $totalRecFees = $monthData->sum('received_amount');
+                $totalDueFees = $monthData->sum('due_amount');
+                $paymentDate = Carbon::parse($monthData->first()->payment_date)->format('d-m-y');
+                $monthPaid = $monthData->first()->month_name;
+                $isPaid = $monthData->first()->is_paid;
+                $details = $monthData->map(function ($item) {
+                    return [
+                        'feeHeadName' => $item->fee_head_name,
+                        'amount' => $item->fee_amount,
+                        'receivedAmount' => $item->received_amount,
+                        'dueAmount' => $item->due_amount,
+                    ];
+                });
+                return [
+                    'monthName' => $monthData->first()->month_name,
+                    'receiptNo' => $monthData->first()->receipt_no,
+                    'totalFees' => $totalFees,
+                    'receivedAmount' => $totalRecFees,
+                    'dueAmount' => $totalDueFees,
+                    'paymentDate' => $paymentDate,
+                    'monthPaid' => $monthPaid,
+                    'isPaid' => $isPaid,
+                    'details' => $details->toArray(),
+                ];
+            });
+            $result["stdDetails"] = $student;
+            $result["feeDetails"] = $monthWiseData->values()->toArray();
+            return responseMsgs(true, "View All Records", $result, "", "API_6.", responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            return responseMsgs(false, $e->getMessage(), [], "", "API_6.", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
+
+    public function updateDue(Request $req)
+    {
+        $validator = Validator::make($req->all(), [
+            'feeCollId' => 'required|numeric',
+            'receivedAmount' => 'required|numeric',
+            'dueAmount' => 'numeric|nullable'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            DB::beginTransaction();
+            $dt =   Carbon::now();
+            $getData = $this->_mFeeCollections::findOrFail($req->feeCollId);
+            $totalFee = $getData->fee_amount;
+            $recFee = $getData->received_amount + $req->receivedAmount;
+            $dueFee = $totalFee - $recFee;
+
+            if ($recFee > $totalFee)
+                throw new Exception("Fee amount can not be greater than total fee");
+
+            $metaReqs = [
+                'id' => $req->feeCollId,
+                'received_amount' => $recFee,
+                'due_amount' => $dueFee,
+                'version_no' => $getData->version_no + 1,
+                'updated_at' => Carbon::now()
+            ];
+            $metaReqs = array_merge($metaReqs, [
+                'json_logs' => trim($getData->json_logs . ", { last-update : " . $dt . "} ," . json_encode($metaReqs), ",")
+            ]);
+            $getData->update($metaReqs);
+            $data = [
+                'monthName' => $getData->month_name,
+                'admissionNo' => $getData->admission_no,
+                'className' => $getData->class_name,
+                'className' => $getData->class_name,
+                'feeHeadName' => $getData->fee_head_name,
+                'totalFeeAmount' => $totalFee,
+                'receivedAmount' => $recFee,
+                'dueAmount' => $dueFee
+            ];
+            DB::commit();
+            $queryTime = collect(DB::getQueryLog())->sum("time");
+            return responseMsgsT(true, "Updated Successfully", $data, "API_6.3", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            DB::rollback();
+            return responseMsgs(false, $e->getMessage(), [], "", "API_6.3", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
+
+    /**
+     * | Get Records By Id
+     */
+    // public function showById(Request $req)
+    // {
+    //     $validator = Validator::make($req->all(), [
+    //         'id' => 'required|numeric'
+    //     ]);
+    //     if ($validator->fails())
+    //         return responseMsgs(false, $validator->errors(), []);
+    //     try {
+    //         $show = $this->_mFeeCollections->getGroupById($req);
+    //         if (collect($show)->isEmpty())
+    //             throw new Exception("Data Not Found");
+    //         return responseMsgs(true, "", $show, "", "API_15.3", responseTime(), "POST", $req->deviceId ?? "");
+    //     } catch (Exception $e) {
+    //         return responseMsgs(false, $e->getMessage(), [], "", "API_15.3", responseTime(), "POST", $req->deviceId ?? "");
+    //     }
+    // }
+
+
+
+
 
     //for future refrence
 

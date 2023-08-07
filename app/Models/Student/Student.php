@@ -23,8 +23,10 @@ class Student extends Model
 
   public function readStudentGroup($req)
   {
-    return Student::where('admission_no', $req->admissionNo)
+    return Student::where(DB::raw('upper(admission_no)'), strtoupper($req->admissionNo))
+      //where('admission_no', $req->admissionNo)
       // ->where('financial_year', $req->financialYear)
+      //where(DB::raw('upper(admission_no)'), strtoupper($req->admissionNo))->get();
       ->where('status', 1)
       ->get();
   }
@@ -65,13 +67,67 @@ class Student extends Model
       ->orderByDesc('a.id');
   }
 
+
+
+  public function getStudentByClassAndAdmissionNoWiseHistory($req)
+  {
+
+    // Fetch the data from the database
+    $data = FeeCollection::all();
+
+    // Initialize an empty array to store the formatted data
+    $formattedData = [];
+
+    // Group the data by 'fy_name', 'class_name', and 'admission_no'
+    $groupedData = $data->groupBy(['fy_name', 'class_name', 'admission_no']);
+
+    foreach ($groupedData as $key => $collection) {
+      // Extract the financial year, class, and admission number from the key
+      list($fyName, $className, $admissionNo) = explode('_', $key);
+
+      // Initialize an empty array to store the fee details for each month
+      $feeDetails = [];
+
+      foreach ($collection as $record) {
+        $feeDetails[] = [
+          'id' => $record->id,
+          'feeHeadName' => $record->fee_head_name,
+          'amount' => $record->fee_amount,
+          'receivedAmount' => $record->received_amount,
+          'dueAmount' => $record->due_amount,
+        ];
+      }
+
+      // Add the formatted data for each admission number to the main array
+      $formattedData[] = [
+        'fyName' => $fyName,
+        'class' => $className,
+        'admission_no' => $admissionNo,
+        'feeHistory' => [
+          [
+            'monthName' => 'January', // You can dynamically get the month name based on month_id if needed.
+            'feeDtl' => $feeDetails,
+          ],
+          [
+            'monthName' => 'February', // You can dynamically get the month name based on month_id if needed.
+            'feeDtl' => $feeDetails,
+          ],
+          // Add other months here as needed...
+        ],
+      ];
+    }
+
+    // Convert the formatted data to JSON and return it
+    return response()->json($formattedData);
+  }
+
   //search student by class wise and admission no wise  
   public function getStudentByClassAndAdmissionNo($req)
   {
     // print_var($req);
     return DB::table('students as a')
       ->select(
-        DB::raw("a.admission_no,a.roll_no,a.full_name,a.gender_name,a.email,a.mobile,a.disability,a.father_name,
+        DB::raw("a.admission_no,a.roll_no,a.full_name,a.gender_name,a.email,a.mobile,a.disability,a.father_name,a.id,
         e.category_name,
         c.class_name,
         d.section,
@@ -101,7 +157,7 @@ class Student extends Model
   {
     return DB::table('students as a')
       ->select(
-        DB::raw("a.admission_no,a.roll_no,a.full_name,a.gender_name,a.email,a.mobile,a.disability,a.father_name,
+        DB::raw("a.admission_no,a.roll_no,a.full_name,a.gender_name,a.email,a.mobile,a.disability,a.father_name,a.id,
         e.category_name,
         c.class_name,
         d.section,

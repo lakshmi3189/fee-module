@@ -13,8 +13,7 @@ class FinancialYearSeeder extends Seeder
      */
     public function run(): void
     {
-        $section = ['2023-2024', '2024-2025'];
-
+        $section = ['2023-2024'];
         foreach ($section as $val) {
             DB::table('ms_financial_years')->insert([
                 'financial_year' => $val,

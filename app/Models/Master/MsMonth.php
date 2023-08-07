@@ -11,6 +11,11 @@ class MsMonth extends Model
   use HasFactory;
   protected $guarded = [];
 
+  public function getExist($req)
+  {
+    return MsMonth::where(DB::raw('upper(month_name)'), strtoupper($req->monthName))->get();
+  }
+
   /*Read all Records by*/
   public function retrieve()
   {
@@ -45,5 +50,18 @@ class MsMonth extends Model
       ->where('status', 1)
       ->orderBy('id')
       ->get();
+  }
+
+  public function getMonthList()
+  {
+    $activeMonths = MsMonth::select('id', 'month_name')
+      ->where('status', 1)
+      ->orderBy('id')
+      ->get();
+    $months = [];
+    foreach ($activeMonths as $month) {
+      $months[$month->id] = $month->month_name;
+    }
+    return $months;
   }
 }
