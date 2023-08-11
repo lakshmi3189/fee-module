@@ -124,11 +124,11 @@ class ClassMasterController extends Controller
         if ($validator->fails())
             return responseMsgs(false, $validator->errors(), []);
         try {
-            $isGroupExists = $this->_mClassMasters::where('class_name', $req->className)->get();
+            $isGroupExists = $this->_mClassMasters::where('class_name', Str::upper($req->className))->get();
             if (collect($isGroupExists)->isNotEmpty())
                 throw new Exception("Head Name Already Existing");
             $metaReqs = [
-                'class_name' => Str::title($req->className),
+                'class_name' => Str::upper($req->className),
                 'created_by' => authUser()->id,
                 'ip_address' => getClientIpAddress(),
                 'version_no' => 0

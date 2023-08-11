@@ -37,7 +37,7 @@ class User extends Authenticatable
     public function getGroupById($req)
     {
         return User::select(
-            DB::raw("id,name,email,user_name,remember_token,
+            DB::raw("id,name,email,user_name,remember_token,area,address,
         CASE 
             WHEN status = '0' THEN 'Deactivated'  
             WHEN status = '1' THEN 'Active'

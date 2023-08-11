@@ -79,6 +79,11 @@ Route::middleware('auth:sanctum')->group(function () {
     //ReportController
     Route::controller(ReportController::class)->group(function () {
         Route::post('report/monthly-fee', 'showFyClassMonthReport');              // Store                     API_7.1
+        Route::post('report/fy-chart', 'showByFyAndMonthWise');                   // for chart view            API_7.2
+        Route::post('report/fee-summary', 'feeComparision');                      // fee summery               API_7.3
+        Route::post('class-wise/demand-report', 'classWiseDemandReport');         // fee summery               API_7.4
+        Route::post('class-wise/received-fee-report', 'classWiseReceiveFeeReport'); // fee summery             API_7.5
+
     });
 });
 

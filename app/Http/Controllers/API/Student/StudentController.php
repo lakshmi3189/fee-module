@@ -125,6 +125,22 @@ class StudentController extends Controller
                             $genderId = 3;
                         }
 
+                        //getting mid session data
+                        $midSession = null;
+                        $midSession = $data[16];
+                        if ($midSession == 'yes' || $midSession == 'Yes' || $midSession == 'YES') {
+                            $midSession = 1;
+                        } else {
+                            $midSession = 0;
+                        }
+
+                        // getting month id...
+                        $monthName = $data[17];
+                        $monthNameObj = MsMonth::where('month_name', $monthName)->firstOrFail();
+                        $monthId = $monthNameObj->id;
+
+
+
                         // $disabilityId = null;
                         // $disability = $data[10];
                         // $data[10] == 'no' ? 0 : 1
@@ -159,6 +175,8 @@ class StudentController extends Controller
                             'version_no' => 1,
                             'status' => $data[14] == 'active' ? 1 : 0,
                             'father_name' => $data[15],
+                            'is_mid_session' => $midSession,
+                            'month_id' => $monthId,
                         );
 
                         $insertData = array_merge($insertData, [
@@ -253,14 +271,20 @@ class StudentController extends Controller
     {
         $validator = Validator::make($req->all(), [
             'fyId' => 'required',
+            'monthId' => 'required|numeric',
+            'rollNo' => 'required|numeric',
             'admissionDate' => 'required|date',
+            'dob' => 'required|date',
             'fullName'     => 'required|string',
             'fatherName'     => 'required|string',
+            'email'     => 'string|nullable',
+            'mobile' => 'required|numeric',
             'admissionNo'  => 'required|string',
             'classId'    => 'required|string',
             'sectionId'  => 'required|string',
             'gender'   => 'required|string',
             'specialAbility'  => 'required',
+            'isMidSession'  => 'required|numeric',
             'quotaId' => 'required'
         ]);
         if ($validator->fails())
@@ -296,19 +320,26 @@ class StudentController extends Controller
             } else {
                 $genderName = 'Others';
             }
+
             $metaReqs = array(
                 'admission_date' => $req->admissionDate,
                 'full_name' => $req->fullName,
                 'father_name' => $req->fatherName,
                 'class_id' => $req->classId,
                 'class_name' => $className,
+                'roll_no' => $req->rollNo,
+                'dob' => $req->dob,
+                'email' => $req->email,
+                'mobile' => $req->mobile,
                 'section_id' => $req->sectionId,
                 'section_name' => $sectionName,
                 'admission_no' => Str::title($req->admissionNo),
                 'gender_id' => $req->gender,
+                'is_mid_session' => $req->isMidSession,
                 'gender_name' => $genderName,
                 'disability' => $req->specialAbility,
                 'category_id' => $req->categoryId,
+                'month_id' => $req->monthId,
                 'category_name' => $categoryName,
                 'financial_year' => $fyName,
                 'fy_id' => $req->fyId,

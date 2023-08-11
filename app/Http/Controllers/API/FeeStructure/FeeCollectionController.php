@@ -49,12 +49,14 @@ class FeeCollectionController extends Controller
             'className' => 'required|string',
             'admissionNo' => 'required|string',
             'paymentMode' => 'required|string',
+            'discount' => 'numeric|nullable',
+            'discountDescription' => 'string|nullable',
             'paymentDate' => 'required|string',
             'feeCollection' => 'required|array',
             'feeCollection.*.monthId' => 'required|numeric',
             'feeCollection.*.monthName' => 'required|string',
             'feeCollection.*.feeHeadId' => 'required|numeric',
-            'feeCollection.*.feeHeadName' => 'required|string',
+            'feeCollection.*.feeHeadName' => 'string|nullable',
             'feeCollection.*.amount' => 'required|numeric',
             'feeCollection.*.receivedAmount' => 'required|numeric',
             'feeCollection.*.dueAmount' => 'required|numeric',
@@ -93,6 +95,8 @@ class FeeCollectionController extends Controller
                 $feeCollection->admission_no = Str::title($req['admissionNo']);
                 $feeCollection->class_id = $req['classId'];
                 $feeCollection->class_name = $req['className'];
+                $feeCollection->discount = $req['discount'];
+                $feeCollection->discount_description = $req['discountDescription'];
                 $feeCollection->payment_mode = $req['paymentMode'];
                 $feeCollection->payment_date = $req['paymentDate'];
                 $feeCollection->fee_head_id = $feeData['feeHeadId'];
@@ -152,6 +156,8 @@ class FeeCollectionController extends Controller
             $monthWiseData = $feeCollection->groupBy('month_name')->map(function ($monthData) {
                 $totalFees = $monthData->sum('fee_amount');
                 $totalRecFees = $monthData->sum('received_amount');
+                $discount = $monthData->first()->discount;
+                $netPay = ($totalRecFees - (($totalRecFees * $discount) / 100));
                 $totalDueFees = $monthData->sum('due_amount');
                 $paymentDate = Carbon::parse($monthData->first()->payment_date)->format('d-m-y');
                 $monthPaid = $monthData->first()->month_name;
@@ -171,6 +177,8 @@ class FeeCollectionController extends Controller
                     'receivedAmount' => $totalRecFees,
                     'dueAmount' => $totalDueFees,
                     'paymentDate' => $paymentDate,
+                    'discount' => $discount,
+                    'netPay' => $netPay,
                     'monthPaid' => $monthPaid,
                     'isPaid' => $isPaid,
                     'isMonthPresent' => $isMonth,
@@ -216,6 +224,7 @@ class FeeCollectionController extends Controller
 
             // $receiptNo = $req->input('receiptNo');
 
+
             $mStudents = Student::whereRaw('LOWER(admission_no) LIKE ?', [strtolower("%$req->admissionNo%")])
                 ->where('status', 1)
                 ->first();
@@ -251,6 +260,9 @@ class FeeCollectionController extends Controller
             $monthWiseData = $feeCollection->groupBy('month_name')->map(function ($monthData) {
                 $totalFees = $monthData->sum('fee_amount');
                 $totalRecFees = $monthData->sum('received_amount');
+                $discount = $monthData->first()->discount;
+                $netPay = ($totalRecFees - (($totalRecFees * $discount) / 100));
+                $words = getIndianCurrency($netPay);
                 $totalDueFees = $monthData->sum('due_amount');
                 $paymentDate = Carbon::parse($monthData->first()->payment_date)->format('d-m-y');
                 $monthPaid = $monthData->first()->month_name;
@@ -270,6 +282,9 @@ class FeeCollectionController extends Controller
                     'receivedAmount' => $totalRecFees,
                     'dueAmount' => $totalDueFees,
                     'paymentDate' => $paymentDate,
+                    'discount' => $discount,
+                    'netPay' => $netPay,
+                    'inWords' => $words,
                     'monthPaid' => $monthPaid,
                     'isPaid' => $isPaid,
                     'details' => $details->toArray(),
@@ -280,6 +295,32 @@ class FeeCollectionController extends Controller
             return responseMsgs(true, "View All Records", $result, "", "API_6.", responseTime(), "POST", $req->deviceId ?? "");
         } catch (Exception $e) {
             return responseMsgs(false, $e->getMessage(), [], "", "API_6.", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
+
+    public function convertAmountToWords($amount)
+    {
+        $ones = array(
+            1 => "One", 2 => "Two", 3 => "Three", 4 => "Four", 5 => "Five",
+            6 => "Six", 7 => "Seven", 8 => "Eight", 9 => "Nine", 10 => "Ten",
+            11 => "Eleven", 12 => "Twelve", 13 => "Thirteen", 14 => "Fourteen", 15 => "Fifteen",
+            16 => "Sixteen", 17 => "Seventeen", 18 => "Eighteen", 19 => "Nineteen"
+        );
+        $tens = array(
+            2 => "Twenty", 3 => "Thirty", 4 => "Forty", 5 => "Fifty",
+            6 => "Sixty", 7 => "Seventy", 8 => "Eighty", 9 => "Ninety"
+        );
+
+        if ($amount < 20) {
+            return $ones[$amount];
+        } elseif ($amount < 100) {
+            return $tens[floor($amount / 10)] . " " . $ones[$amount % 10];
+        } elseif ($amount < 1000) {
+            return $ones[floor($amount / 100)] . " Hundred " . $this->convertAmountToWords($amount % 100);
+        } elseif ($amount < 1000000) {
+            return $this->convertAmountToWords(floor($amount / 1000)) . " Thousand " . $this->convertAmountToWords($amount % 1000);
+        } else {
+            return "Out of Range";
         }
     }
 
