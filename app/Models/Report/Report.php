@@ -23,7 +23,8 @@ class Report extends Model
             ")
         )
             ->where('fy_id', $req->fyId)
-            ->where('class_id', $req->classId);
+            ->where('class_id', $req->classId)
+            ->orderByDesc('updated_at');
 
         // If monthId is provided and not null, add the where clause for month_id
         if ($req->monthId) {
@@ -35,7 +36,15 @@ class Report extends Model
             throw new Exception("Data Not Found");
 
         $studentIds = $feeCollection->pluck('student_id')->unique();
-        $students = Student::select('id', 'admission_no', 'full_name')->whereIn('id', $studentIds)->get();
+        $students = Student::select(
+            DB::raw("id,admission_no,full_name,
+            CASE 
+                WHEN is_mid_session = '1' THEN 'Mid Session'  
+                WHEN is_mid_session = '0' THEN 'Regular Session'
+            END as is_mid_session
+            ")
+        )->whereIn('id', $studentIds)->get();
+        // $students = Student::select('id', 'admission_no', 'full_name')->whereIn('id', $studentIds)->get();
         if (collect($students)->isEmpty())
             throw new Exception("No Students Found with Fee Collection for the Given Criteria");
 
@@ -85,34 +94,54 @@ class Report extends Model
         return $finaldata->values()->toArray();
     }
 
-    // public function feeCollections()
-    // {
-    //     return $this->hasMany(FeeCollection::class, 'student_id', 'id');
-    // }
 
-    /*Read all Active Records*/
-    // public function feeStatus()
-    // {
-    //     return DB::table('fee_collections as a')
-    //         ->select(
-    //             DB::raw("
-    //   b.financial_year,c.class_name,d.fee_head_type,e.fee_head_name,f.month_name,a.fee_amount,a.description,
-    //   CASE 
-    //   WHEN a.status = '0' THEN 'Deactivated'  
-    //   WHEN a.status = '1' THEN 'Active'
-    //   END as status,
-    //   TO_CHAR(a.created_at::date,'dd-mm-yyyy') as date,
-    //   TO_CHAR(a.created_at,'HH12:MI:SS AM') as time
-    //   ")
-    //         )
-    //         ->join('ms_financial_years as b', 'b.id', '=', 'a.fy_id')
-    //         ->join('ms_classes as c', 'c.id', '=', 'a.class_id')
-    //         ->join('fm_fee_head_types as d', 'd.id', '=', 'a.fee_head_type_id')
-    //         ->join('fm_fee_heads as e', 'e.id', '=', 'a.fee_head_id')
-    //         ->join('ms_months as f', 'f.id', '=', 'a.month_id')
-    //         ->where('a.status', 1)
-    //         ->orderBy('a.month_id')
-    //         ->where('status', 1)
-    //         ->get();
-    // }
+    public function getFyAndMonthByReport($req)
+    {
+        $monthSums = DB::table('fee_collections')
+            ->select(
+                'fy_id',
+                'month_id',
+                'month_name',
+                DB::raw('SUM(fee_amount) as total_fee'),
+                DB::raw('SUM(received_amount) as total_received'),
+                DB::raw('SUM(due_amount) as total_due')
+            )
+            ->where('fy_id', $req->fyId)
+            ->where('status', 1)
+            ->groupBy('fy_id', 'month_id', 'month_name')
+            ->orderBy('month_id')
+            ->get();
+        $chartData = [];
+        foreach ($monthSums as $monthSum) {
+            $total = 0;
+            $chartData[] = [
+                'monthId' => $monthSum->month_id,
+                'monthName' => $monthSum->month_name,
+                'feeDtl' => [
+                    [
+                        'totalAmount' => $monthSum->total_fee,
+                        'totalReceived' => $monthSum->total_received,
+                        'totalDue' => $monthSum->total_due,
+                    ],
+                ],
+            ];
+        }
+        return $chartData;
+    }
+
+
+    public function getFyByReport($req)
+    {
+
+
+        $fyTotals = DB::table('fee_collections')
+            ->select(
+                DB::raw('SUM(fee_amount) as totalFyFee'),
+                DB::raw('SUM(received_amount) as totalFyReceive'),
+                DB::raw('SUM(due_amount) as totalFyDue')
+            )
+            ->where('fy_id', $req->fyId)
+            ->first();
+        return $fyTotals;
+    }
 }

@@ -7,12 +7,11 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Models\Report\Report;
 use App\Models\FeeStructure\FeeCollection;
+use App\Models\FeeStructure\FmClassFeeMaster;
+use App\Models\Student\Student;
+use App\Models\Master\MsClass;
 use Exception;
 use DB;
-
-/**commented due to change in new version code */
-// use App\Models\Student\Student;
-// use Illuminate\Support\Carbon;
 
 
 /**
@@ -23,16 +22,20 @@ use DB;
 class ReportController extends Controller
 {
     private $_mReports;
+    private $_mStudents;
     private $_mFeeCollections;
+    private $_mFmClassFeeMasters;
 
     public function __construct()
     {
         DB::enableQueryLog();
         $this->_mReports = new Report();
+        $this->_mStudents = new Student();
         $this->_mFeeCollections = new FeeCollection();
+        $this->_mFmClassFeeMasters = new FmClassFeeMaster();
     }
 
-    // version-2: written all login inside the model
+    // show class and month wise due fee report
     public function showFyClassMonthReport(Request $req)
     {
         $validator = Validator::make($req->all(), [
@@ -51,550 +54,246 @@ class ReportController extends Controller
         }
     }
 
-    public function getFeeCollectionJson()
+    // show fy wise and month wise total fees showing in dashboard
+    public function showByFyAndMonthWise(Request $req)
     {
-        // Fetch the data from the database
-        $data = FeeCollection::all();
-
-        // Initialize an empty array to store the formatted data
-        $formattedData = [];
-
-        // Group the data by 'fy_name', 'class_name', and 'admission_no'
-        $groupedData = $data->groupBy(['fy_name', 'class_name', 'admission_no']);
-
-        foreach ($groupedData as $key => $collection) {
-            // Extract the financial year, class, and admission number from the key
-            list($fyName, $className, $admissionNo) = explode('_', $key);
-
-            // Initialize an empty array to store the fee details for each month
-            $feeDetails = [];
-
-            foreach ($collection as $record) {
-                $feeDetails[] = [
-                    'id' => $record->id,
-                    'feeHeadName' => $record->fee_head_name,
-                    'amount' => $record->fee_amount,
-                    'receivedAmount' => $record->received_amount,
-                    'dueAmount' => $record->due_amount,
-                ];
-            }
-
-            // Add the formatted data for each admission number to the main array
-            $formattedData[] = [
-                'fyName' => $fyName,
-                'class' => $className,
-                'admission_no' => $admissionNo,
-                'feeHistory' => [
-                    [
-                        'monthName' => 'January', // You can dynamically get the month name based on month_id if needed.
-                        'feeDtl' => $feeDetails,
-                    ],
-                    [
-                        'monthName' => 'February', // You can dynamically get the month name based on month_id if needed.
-                        'feeDtl' => $feeDetails,
-                    ],
-                    // Add other months here as needed...
-                ],
-            ];
+        $validator = Validator::make($req->all(), [
+            'fyId' => 'required|numeric'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            $result = $this->_mReports->getFyAndMonthByReport($req);
+            $queryTime = collect(DB::getQueryLog())->sum("time");
+            return responseMsgsT(true, "View Fee Details", $result, "API_7.2", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            return responseMsgs(false, $e->getMessage(), [], "", "API_7.2", responseTime(), "POST", $req->deviceId ?? "");
         }
-
-        // Convert the formatted data to JSON and return it
-        return response()->json($formattedData);
     }
 
+    // show fy wise total fees : comparision
+    public function feeComparision(Request $req)
+    {
+        $validator = Validator::make($req->all(), [
+            'fyId' => 'required|numeric'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            // get class wise actual fees
+            $classAndFyWiseFeeCounts = $this->_mFmClassFeeMasters::select('class_id', DB::raw('SUM(fee_amount) as fee_amount'))
+                ->where('status', 1)
+                ->where('fy_id', $req->fyId)
+                ->groupBy('class_id', 'fy_id', 'status')
+                ->orderBy('class_id')
+                ->get();
+            // 'perMonthFee' => number_format($perMonth, 2),
+            foreach ($classAndFyWiseFeeCounts as $fee) {
+                $perMonth = $fee['fee_amount'] / 12;
+                $getClsFeeData[] = [
+                    'classId' => $fee['class_id'],
+                    'totalFee' => $fee['fee_amount'],
+                    'perMonthFee' => round($perMonth, 2),
+                ];
+            }
+            //get fee collection
+            $classAndFyWiseFeeCollCounts = $this->_mFeeCollections::select(
+                'class_id',
+                DB::raw('SUM(fee_amount) as fee_amount'),
+                DB::raw('SUM(received_amount) as received_amount'),
+                DB::raw('SUM(due_amount) as due_amount'),
+                DB::raw("student_id")
+            )
+                ->where('status', 1)
+                ->where('fy_id', $req->fyId)
+                ->groupBy('class_id', 'fy_id', 'status', "student_id")
+                ->orderBy('class_id')
+                ->get();
 
-    // version-1: written all login in this controller
-    // public function showFyClassMonthReport_old(Request $req)
-    // {
-    //     $validator = Validator::make($req->all(), [
-    //         'fyId' => 'required|numeric',
-    //         'classId' => 'required|numeric',
-    //         'monthId' => 'numeric|nullable'
-    //     ]);
-    //     if ($validator->fails())
-    //         return responseMsgs(false, $validator->errors(), []);
+            foreach ($classAndFyWiseFeeCollCounts as $feeColl) {
+                $getFeeCollData[] = [
+                    'classId' => $feeColl['class_id'],
+                    'totalFee' => $feeColl['fee_amount'],
+                    "studentId" => $feeColl['student_id'],
+                    'totalReceive' => $feeColl['received_amount'],
+                    'totalDue' => $feeColl['due_amount']
+                ];
+            }
+            //get total student
+            $classAndFyWiseStudentCounts = $this->_mStudents::select('class_id', 'month_id', DB::raw("count(*) as total_students, string_agg(cast(id as text),',') as ids"))
+                ->where('status', 1)
+                ->where('fy_id', $req->fyId)
+                ->groupBy('class_id', 'fy_id', 'status', 'month_id')
+                ->orderBy('class_id')
+                ->get();
+            $actualTotal = 0;
+            $receivedAmount = 0;
+            $diffrence = 0;
+            foreach ($classAndFyWiseStudentCounts as $std) {
+                $totalMonth = ((12 - $std['month_id']) + 1);
+                $fee = (collect($getClsFeeData)->where("classId", $std['class_id']));
+                $collection = (collect($getFeeCollData)->where("classId", $std['class_id'])->whereIN("studentId", $std['ids']));
+                $recevingAmt =  $collection->sum("totalReceive");
+                // $totalDue =  $collection->sum("totalDue");
+                $actuleDemand =  $totalMonth * $fee->sum("perMonthFee") * $std['total_students'];
+                $getStdData[] = [
+                    'classId' => $std['class_id'],
+                    'monthId' =>  $std['month_id'],
+                    'totalMonth' => $totalMonth,
+                    "perMonthFee" => $fee->sum("perMonthFee"),
+                    'totalStudent' => $std->total_students,
+                    "actuleDemand" => $actuleDemand,
+                    "totalReceive" => $recevingAmt,
+                    "totalDue" => $actuleDemand - $recevingAmt,
+                    "totalFee" => $fee->sum("totalFee"),
+                ];
+                $actualTotal = round($actualTotal + $actuleDemand, 2);
+                $receivedAmount = round($receivedAmount + $recevingAmt, 2);
+                $diffrence = $actualTotal - $receivedAmount;
+            }
+            $result = ["actualAmount" => $actualTotal, "receiveAmount" => $receivedAmount, "diff" => $diffrence, "details" => $getStdData];
+            $queryTime = collect(DB::getQueryLog())->sum("time");
+            return responseMsgsT(true, "View Details", $result, "API_7.3", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            return responseMsgs(false, $e->getMessage(), [], "", "API_7.3", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
 
-    //     try {
-    //         $query = FeeCollection::where('fy_id', $req->fyId)
-    //             ->where('class_id', $req->classId);
+    // class wise demand fee reporting;
+    public function classWiseDemandReport(Request $req)
+    {
+        $validator = Validator::make($req->all(), [
+            'fyId' => 'required|numeric'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            $totalsAndFees = FmClassFeeMaster::where('status', 1)
+                ->where('fy_id', $req->fyId)
+                ->groupBy('class_id', 'fy_id')
+                ->selectRaw('class_id, fy_id, SUM(fee_amount) as total_fees')
+                ->orderBy('class_id')
+                ->get();
 
-    //         // If monthId is provided and not null, add the where clause for month_id
-    //         if ($req->monthId) {
-    //             $query->where('month_id', $req->monthId);
-    //         }
-    //         $feeCollection = $query->get();
-    //         $monthNames = $feeCollection->pluck('month_name')->unique();
-    //         if (collect($feeCollection)->isEmpty())
-    //             throw new Exception("Data Not Found");
+            $activeStudentsByClass = Student::where('status', 1)
+                ->where('fy_id', $req->fyId)
+                ->groupBy('class_id', 'fy_id')
+                ->selectRaw('class_id, fy_id, COUNT(*) as active_students_count')
+                ->get();
 
-    //         $studentIds = $feeCollection->pluck('student_id')->unique();
-    //         $students = Student::select('id', 'admission_no', 'full_name')->whereIn('id', $studentIds)->get();
-    //         if (collect($students)->isEmpty())
-    //             throw new Exception("No Students Found with Fee Collection for the Given Criteria");
+            $inactiveStudentsByClass = Student::where('status', 0)
+                ->where('fy_id', $req->fyId)
+                ->groupBy('class_id', 'fy_id')
+                ->selectRaw('class_id, fy_id, COUNT(*) as inactive_students_count')
+                ->get();
 
-    //         $finaldata = $monthNames->map(function ($monthName) use ($feeCollection, $students) {
-    //             return $students->map(function ($student, $key) use ($feeCollection, $monthName) {
-    //                 $studentFee = $feeCollection->where("student_id", $student->id)->where('month_name', $monthName);
-    //                 $className = ($studentFee->values())[0]["class_name"] ?? null;
-    //                 $fyName = ($studentFee->values())[0]["fy_name"] ?? null;
-    //                 $feehead = $studentFee->pluck("fee_head_name")->unique();
+            $finalResult = [];
+            $getDetl = [];
 
-    //                 $feeDetails = $feehead->map(function ($headName, $key) use ($studentFee) {
-    //                     $fee = $studentFee->where('fee_head_name', $headName);
-    //                     return [
-    //                         'feeHeadName' => $headName,
-    //                         'amount' => $fee->sum("fee_amount"),
-    //                         'receivedAmount' => $fee->sum("received_amount"),
-    //                         'dueAmount' => $fee->sum("due_amount"),
-    //                     ];
-    //                 })->values();
-    //                 return [
-    //                     'fyName' => $fyName,
-    //                     'class' => $className,
-    //                     'monthName' => $monthName,
-    //                     'studentDtl' => $student,
-    //                     'feeDtl' => $feeDetails,
-    //                 ];
-    //             });
-    //         });
-    //         $result = $finaldata->values()->toArray();
-    //         $queryTime = collect(DB::getQueryLog())->sum("time");
-    //         return responseMsgsT(true, "View All Records", $result, "API_7.1", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "API_7.1", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
+            $totalActiveFee = 0;
+            $totalDeactiveFee = 0;
+            $classWiseTotalFee = 0;
 
-    /*******************************************************************************************************************************
-     * dummy code start
-     *******************************************************************************************************************************/
+            foreach ($totalsAndFees as $totalAndFee) {
+                $classId = $totalAndFee->class_id;
 
-    // public function showFyClassMonthReport1(Request $req)
-    // {
-    //     $validator = Validator::make($req->all(), [
-    //         'fyId' => 'required|numeric',
-    //         'classId' => 'required|numeric',
-    //         'monthId' => 'numeric|nullable'
-    //     ]);
-    //     if ($validator->fails())
-    //         return responseMsgs(false, $validator->errors(), []);
+                $getcls = MsClass::where('id', $classId)->first();
+                $className = $getcls->class_name;
 
-    //     try {
-    //         Db::enableQueryLog();
-    //         $query = FeeCollection::where('fy_id', $req->fyId)
-    //             ->where('class_id', $req->classId);
+                $fyId = $totalAndFee->fy_id;
 
-    //         // If monthId is provided and not null, add the where clause for month_id
-    //         if ($req->monthId) {
-    //             $query->where('month_id', $req->monthId);
-    //         }
-    //         $feeCollection = $query->get();
-    //         if (collect($feeCollection)->isEmpty())
-    //             throw new Exception("Data Not Found");
+                $activeCount = $activeStudentsByClass
+                    ->where('class_id', $classId)
+                    ->where('fy_id', $fyId)
+                    ->first()->active_students_count ?? 0;
 
-    //         $studentIds = $feeCollection->pluck('student_id')->unique();
-    //         $students = Student::select('id', 'admission_no', 'class_id', "full_name")->whereIn('id', $studentIds)->get();
-    //         if (collect($students)->isEmpty())
-    //             throw new Exception("No Students Found with Fee Collection for the Given Criteria");
+                $inactiveCount = $inactiveStudentsByClass
+                    ->where('class_id', $classId)
+                    ->where('fy_id', $fyId)
+                    ->first()->inactive_students_count ?? 0;
 
-    //         $monthWiseData = $feeCollection->groupBy(['month_name', 'class_id'])->map(function ($monthData, $key) use ($students) {
-    //             $monthClassArray = explode('-', $key);
-    //             $monthName = $monthClassArray[0];
-    //             $newdata = collect();
-    //             if (!$monthData->isEmpty()) {
-    //                 $newdata = collect(array_values($monthData->toArray())[0] ?? []);
-    //             }
-    //             $monthData = $newdata;
+                $totalFees = $totalAndFee->total_fees;
 
-    //             $classId = $monthData[0]["class_name"] ?? null; // Set classId to null if not available
-    //             $stdId = $monthData[0]["student_id"] ?? null;
-    //             $studentDtl = ($students->filter(function ($val) use ($stdId) {
-    //                 return $val->id == $stdId;
-    //             }));
-    //             $feeDetails = $students->map(function ($student) use ($monthData) {
-    //                 $details = $monthData->where('student_id', $student->id)->map(function ($item) {
-    //                     return [
-    //                         'feeHeadName' => $item["fee_head_name"],
-    //                         'amount' => $item["fee_amount"],
-    //                         'receivedAmount' => $item["received_amount"],
-    //                         'dueAmount' => $item["due_amount"],
-    //                     ];
-    //                 })->values();
-    //                 return [
-    //                     'details' => $details,
-    //                     "studentDtl" => $student
-    //                 ];
-    //             })->values();
-    //             $studentDtl = $feeDetails->pluck("studentDtl");
-    //             return [
-    //                 'monthName' => $monthName,
-    //                 'class' => $classId,
-    //                 'feeDetails' => $feeDetails,
-    //                 "studentDtl" => $studentDtl,
-    //                 "stdId" => $stdId,
-    //             ];
-    //         });
-    //         $result["data"] = $monthWiseData->values()->toArray();
-    //         return responseMsgs(true, "View All Records", $result, "", "API_6.2", responseTime(), "POST", $req->deviceId ?? "");
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "API_6.2", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
+                $result = [
+                    'class_id' => $className,
+                    'fy_id' => $fyId,
+                    'activeStudentsCounts' => $activeCount,
+                    'inactiveStudentsCounts' => $inactiveCount,
+                    'classWisePerStudentFees' => $totalFees,
+                    'totalFeesFromActiveStudents' => $totalFees * $activeCount,
+                    'totalFeesFromDeactiveStudents' => $totalFees * $inactiveCount,
+                ];
+                $classWiseTotalFee += $totalFees;
+                $totalActiveFee += ($totalFees * $activeCount);
+                $totalDeactiveFee += ($totalFees * $inactiveCount);
+                $actualAmount = $totalActiveFee + $totalDeactiveFee;
+                $finalResult[] = $result;
+            }
+            $getDetl = [
+                "classWisePerStudentFees" => $classWiseTotalFee,
+                "activeStudentTotalFees" => $totalActiveFee,
+                "deactiveStudentTotalFees" => $totalDeactiveFee,
+                "demandAmounts" => $actualAmount
+            ];
+            $result =  [
+                "commonDetails" => $getDetl,
+                "classWiseDetails" => $finalResult
+            ];
+            $queryTime = collect(DB::getQueryLog())->sum("time");
+            return responseMsgsT(true, "View Report", $result, "API_7.4", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            return responseMsgs(false, $e->getMessage(), [], "", "API_7.4", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
 
+    // class wise demand fee reporting;
+    public function classWiseReceiveFeeReport(Request $req)
+    {
+        $validator = Validator::make($req->all(), [
+            'fyId' => 'required|numeric'
+        ]);
+        if ($validator->fails())
+            return responseMsgs(false, $validator->errors(), []);
+        try {
+            $totalsFeeColl = FeeCollection::where('status', 1)
+                ->where('fy_id', $req->fyId)
+                ->groupBy('class_id', 'fy_id')
+                ->selectRaw('class_id, fy_id, SUM(fee_amount) as fee_amount, SUM(received_amount) as received_amount, 
+                SUM(due_amount) as due_amount')
+                ->orderBy('class_id')
+                ->get();
 
-    // public function showFyClassMonthReportBsckup(Request $req)
-    // {
-    //     $validator = Validator::make($req->all(), [
-    //         'fyId' => 'required|numeric',
-    //         'classId' => 'required|numeric',
-    //         'monthId' => 'numeric|nullable'
-    //     ]);
-    //     if ($validator->fails())
-    //         return responseMsgs(false, $validator->errors(), []);
+            $std = DB::table('fee_collections')->distinct('student_id')->count();
+            $finalResult = [];
+            $totalReceive = 0;
+            $totalDues = 0;
+            foreach ($totalsFeeColl as $totalsFeeColl) {
+                $classId = $totalsFeeColl->class_id;
+                $fyId = $totalsFeeColl->fy_id;
+                $rec = $totalsFeeColl->received_amount;
+                $due = $totalsFeeColl->due_amount;
+                $result = [
+                    'class_id' => $classId,
+                    'fy_id' => $fyId,
+                    // 'activeStudentsCounts' => $std,
+                    'feeAmount' => $totalsFeeColl->fee_amount,
+                    'receivedAmount' => $totalsFeeColl->received_amount,
+                    'dueAmount' => $totalsFeeColl->due_amount,
+                ];
+                $finalResult[] = $result;
+                $totalReceive += $rec;
+                $totalDues += $due;
+            }
+            $result1 =  [
+                "details" => $finalResult,
+                "totalReceivedAmount" => $totalReceive,
+                "totalDue" => $totalDues
+            ];
 
-    //     try {
-    //         // $feeCollection = FeeCollection::where('fy_id', $req->fyId)
-    //         //     ->where('class_id', $req->classId)
-    //         //     ->OrWhere('month_id', $req->monthId)
-    //         //     ->get();
-
-    //         $query = FeeCollection::where('fy_id', $req->fyId)
-    //             ->where('class_id', $req->classId);
-
-    //         // If monthId is provided and not null, add the where clause for month_id
-    //         if ($req->monthId !== null) {
-    //             $query->where('month_id', $req->monthId);
-    //         }
-    //         $feeCollection = $query->get();
-    //         if (collect($feeCollection)->isEmpty())
-    //             throw new Exception("Data Not Found");
-
-    //         $studentIds = $feeCollection->pluck('student_id')->unique();
-    //         $students = Student::select('id', 'admission_no', 'class_id')->whereIn('id', $studentIds)->get();
-    //         if (collect($students)->isEmpty())
-    //             throw new Exception("No Students Found with Fee Collection for the Given Criteria");
-
-    //         $monthWiseData = $feeCollection->groupBy(['month_name', 'class_id'])->map(function ($monthData, $key) use ($students) {
-    //             $monthClassArray = explode('-', $key);
-    //             $monthName = $monthClassArray[0];
-    //             $classId = $monthClassArray[1] ?? null; // Set classId to null if not available
-
-    //             $feeDetails = $students->map(function ($student) use ($monthData) {
-    //                 $details = $monthData->where('student_id', $student->id)->map(function ($item) {
-    //                     return [
-    //                         'feeHeadName' => $item->fee_head_name,
-    //                         'amount' => $item->fee_amount,
-    //                         'receivedAmount' => $item->received_amount,
-    //                         'dueAmount' => $item->due_amount,
-    //                     ];
-    //                 })->values();
-
-    //                 return [
-    //                     'admission' => $student->admission_no,
-    //                     'details' => $details,
-    //                 ];
-    //             })->values();
-
-    //             return [
-    //                 'monthName' => $monthName,
-    //                 'class' => $classId,
-    //                 'feeDetails' => $feeDetails,
-    //             ];
-    //         });
-    //         $result["data"] = $monthWiseData->values()->toArray();
-    //         return responseMsgs(true, "View All Records", $result, "", "API_6.2", responseTime(), "POST", $req->deviceId ?? "");
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "API_6.2", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
-
-    // public function showFyClassMonthReport2(Request $req)
-    // {
-    //     $validator = Validator::make($req->all(), [
-    //         'fyId' => 'required|numeric',
-    //         'classId' => 'required|numeric',
-    //         'monthId' => 'numeric|nullable'
-    //     ]);
-    //     if ($validator->fails())
-    //         return responseMsgs(false, $validator->errors(), []);
-
-    //     try {
-    //         $feeCollection = FeeCollection::where('fy_id', $req->fyId)
-    //             ->where('class_id', $req->classId)
-    //             ->orWhere('month_id', $req->monthId)
-    //             ->get();
-
-    //         if ($feeCollection->isEmpty()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Data Not Found',
-    //             ]);
-    //         }
-
-    //         $studentId = $feeCollection->pluck('student_id')->unique();
-    //         $students = Student::select('id', 'admission_no')->whereIn('id', $studentId)->get();
-
-    //         if ($students->isEmpty()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'No Students Found with Fee Collection for the Given Criteria',
-    //             ]);
-    //         }
-
-    //         $monthWiseData = $feeCollection->groupBy(['month_name', 'class_id'])->map(function ($monthData, $key) use ($students) {
-    //             $monthClassArray = explode('-', $key);
-    //             $monthName = $monthClassArray[0];
-    //             $classId = $monthClassArray[1] ?? null; // Set classId to null if not available
-
-    //             $feeDetails = $students->map(function ($student) use ($monthData) {
-    //                 $details = $monthData->where('student_id', $student->id)->map(function ($item) {
-    //                     return [
-    //                         'feeHeadName' => $item->fee_head_name,
-    //                         'amount' => $item->fee_amount,
-    //                         'receivedAmount' => $item->received_amount,
-    //                         'dueAmount' => $item->due_amount,
-    //                     ];
-    //                 })->values();
-
-    //                 return [
-    //                     'admission' => $student->admission_no,
-    //                     'details' => $details,
-    //                 ];
-    //             })->values();
-
-    //             return [
-    //                 'monthName' => $monthName,
-    //                 'class' => $classId,
-    //                 'feeDetails' => $feeDetails,
-    //             ];
-    //         });
-
-    //         $result["status"] = true;
-    //         $result["message"] = "View All Records";
-    //         $result["meta-data"] = [
-    //             'apiId' => "API_7.1",
-    //             'responsetime' => responseTime(),
-    //             'epoch' => now()->format('Y-m-d H:i:s'),
-    //             'action' => "POST",
-    //             'deviceId' => $req->deviceId ?? ""
-    //         ];
-    //         $result["data"] = $monthWiseData->values()->toArray();
-
-    //         return response()->json($result);
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "API_7.1", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
-
-
-    // public function showFyClassMonthReport22(Request $req)
-    // {
-    //     $validator = Validator::make($req->all(), [
-    //         'fyId' => 'required|numeric',
-    //         'classId' => 'required|numeric',
-    //         'monthId' => 'numeric|nullable'
-    //     ]);
-    //     if ($validator->fails())
-    //         return responseMsgs(false, $validator->errors(), []);
-
-    //     try {
-    //         $feeCollection = FeeCollection::where('fy_id', $req->fyId)
-    //             ->where('class_id', $req->classId)
-    //             ->orWhere('month_id', $req->monthId)
-    //             ->get();
-
-    //         if ($feeCollection->isEmpty()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Data Not Found',
-    //             ]);
-    //         }
-
-    //         $studentId = $feeCollection->pluck('student_id')->unique();
-    //         $students = Student::select('id', 'admission_no')->whereIn('id', $studentId)->get();
-
-    //         $monthWiseData = $feeCollection->groupBy(['month_name', 'class_id'])->map(function ($monthData, $key) use ($students) {
-    //             $monthClassArray = explode('-', $key);
-    //             $monthName = $monthClassArray[0];
-    //             $classId = $monthClassArray[1] ?? null; // Set classId to null if not available
-
-    //             $feeDetails = $students->map(function ($student) use ($monthData) {
-    //                 $details = $monthData->where('student_id', $student->id)->map(function ($item) {
-    //                     return [
-    //                         'feeHeadName' => $item->fee_head_name,
-    //                         'amount' => $item->fee_amount,
-    //                         'receivedAmount' => $item->received_amount,
-    //                         'dueAmount' => $item->due_amount,
-    //                     ];
-    //                 })->values();
-
-    //                 return [
-    //                     'admission' => $student->admission_no,
-    //                     'details' => $details,
-    //                 ];
-    //             })->values();
-
-    //             return [
-    //                 'monthName' => $monthName,
-    //                 'class' => $classId,
-    //                 'feeDetails' => $feeDetails,
-    //             ];
-    //         });
-
-    //         $result["status"] = true;
-    //         $result["message"] = "View All Records";
-    //         $result["meta-data"] = [
-    //             'apiId' => "API_7.1",
-    //             'responsetime' => responseTime(),
-    //             'epoch' => now()->format('Y-m-d H:i:s'),
-    //             'action' => "POST",
-    //             'deviceId' => $req->deviceId ?? ""
-    //         ];
-    //         $result["data"] = $monthWiseData->values()->toArray();
-
-    //         return response()->json($result);
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "API_7.1", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
-
-
-    // public function showFyClassMonthReportdemo(Request $req)
-    // {
-    //     $validator = Validator::make($req->all(), [
-    //         'fyId' => 'required|numeric',
-    //         'classId' => 'required|numeric',
-    //         'monthId' => 'numeric|nullable'
-    //     ]);
-    //     if ($validator->fails())
-    //         return responseMsgs(false, $validator->errors(), []);
-
-    //     try {
-    //         $feeCollection = FeeCollection::where('fy_id', $req->fyId)
-    //             ->where('class_id', $req->classId)
-    //             ->orWhere('month_id', $req->monthId)
-    //             ->get();
-
-    //         if ($feeCollection->isEmpty()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Data Not Found',
-    //             ]);
-    //         }
-
-    //         $studentId = $feeCollection->pluck('student_id')->unique();
-    //         $students = Student::select('id', 'admission_no')->whereIn('id', $studentId)->get();
-
-    //         $monthWiseData = $feeCollection->groupBy(['month_name', 'class_id'])->map(function ($monthData, $key) use ($students) {
-    //             $monthClassArray = explode('-', $key);
-    //             $monthName = $monthClassArray[0];
-    //             $classId = $monthClassArray[1] ?? null; // Set classId to null if not available
-
-    //             $feeDetails = $students->map(function ($student) use ($monthData) {
-    //                 $details = $monthData->where('student_id', $student->id)->map(function ($item) {
-    //                     return [
-    //                         'feeHeadName' => $item->fee_head_name,
-    //                         'amount' => $item->fee_amount,
-    //                         'receivedAmount' => $item->received_amount,
-    //                         'dueAmount' => $item->due_amount,
-    //                     ];
-    //                 })->values();
-
-    //                 return [
-    //                     'admission' => $student->admission_no,
-    //                     'details' => $details,
-    //                 ];
-    //             })->values();
-
-    //             return [
-    //                 'monthName' => $monthName,
-    //                 'class' => $classId,
-    //                 'feeDetails' => $feeDetails,
-    //             ];
-    //         });
-
-    //         $result["status"] = true;
-    //         $result["message"] = "View All Records";
-    //         $result["meta-data"] = [
-    //             'apiId' => "API_7.1",
-    //             'responsetime' => responseTime(),
-    //             'epoch' => now()->format('Y-m-d H:i:s'),
-    //             'action' => "POST",
-    //             'deviceId' => $req->deviceId ?? ""
-    //         ];
-    //         $result["data"] = $monthWiseData->values()->toArray();
-
-    //         return response()->json($result);
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "API_7.1", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
-
-
-
-    // public function showFyClassMonthReport1(Request $req)
-    // {
-
-    //     $validator = Validator::make($req->all(), [
-    //         'fyId' => 'required|numeric',
-    //         'classId' => 'required|numeric',
-    //         'monthId' => 'numeric|nullable'
-    //     ]);
-    //     if ($validator->fails())
-    //         return responseMsgs(false, $validator->errors(), []);
-    //     try {
-    //         $feeCollection = FeeCollection::where('fy_id', $req->fyId)
-    //             ->where('class_id', $req->classId)
-    //             ->orWhere('month_id', $req->monthId)
-    //             ->get();
-    //         if ($feeCollection->isEmpty()) {
-    //             return response()->json([
-    //                 'status' => false,
-    //                 'message' => 'Data Not Found',
-    //                 // 'data' => []
-    //             ]);
-    //         }
-    //         $studentId = $feeCollection->first()->student_id;
-    //         $student = Student::select('admission_no', 'full_name', 'class_name', 'section_name', 'roll_no')->where('id', $studentId)->first();
-
-
-    //         $monthWiseData = $feeCollection->groupBy('month_name')->map(function ($monthData) {
-    //             $totalFees = $monthData->sum('fee_amount');
-    //             $totalRecFees = $monthData->sum('received_amount');
-    //             $totalDueFees = $monthData->sum('due_amount');
-    //             $paymentDate = Carbon::parse($monthData->first()->payment_date)->format('d-m-y');
-    //             $monthPaid = $monthData->first()->month_name;
-    //             $isPaid = $monthData->first()->is_paid;
-    //             $id = $monthData->first()->id;
-    //             $details = $monthData->map(function ($item) {
-    //                 return [
-    //                     'id' => $item->id,
-    //                     'feeHeadName' => $item->fee_head_name,
-    //                     'amount' => $item->fee_amount,
-    //                     'receivedAmount' => $item->received_amount,
-    //                     'dueAmount' => $item->due_amount,
-    //                 ];
-    //             });
-    //             return [
-    //                 // 'id' => $id,
-    //                 'monthName' => $monthData->first()->month_name,
-    //                 'totalFees' => $totalFees,
-    //                 'receivedAmount' => $totalRecFees,
-    //                 'dueAmount' => $totalDueFees,
-    //                 'paymentDate' => $paymentDate,
-    //                 'monthPaid' => $monthPaid,
-    //                 'isPaid' => $isPaid,
-    //                 'details' => $details->toArray(),
-    //             ];
-    //         });
-    //         $result["stdDetails"] = $student;
-    //         $result["feeDetails"] = $monthWiseData->values()->toArray();
-    //         return responseMsgs(true, "View All Records", $result, "", "API_7.1", responseTime(), "POST", $req->deviceId ?? "");
-    //     } catch (Exception $e) {
-    //         return responseMsgs(false, $e->getMessage(), [], "", "API_7.1", responseTime(), "POST", $req->deviceId ?? "");
-    //     }
-    // }
-    /********************************************************************************************************************************
-     * dummy code end
-     *******************************************************************************************************************************/
+            $queryTime = collect(DB::getQueryLog())->sum("time");
+            return responseMsgsT(true, "View Report", $result1, "API_7.5", $queryTime, responseTime(), "POST", $req->deviceId ?? "");
+        } catch (Exception $e) {
+            return responseMsgs(false, $e->getMessage(), [], "", "API_7.5", responseTime(), "POST", $req->deviceId ?? "");
+        }
+    }
 }
